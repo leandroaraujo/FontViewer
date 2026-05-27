@@ -30,36 +30,33 @@
                TextColor="{StaticResource Gray400}" />
 
         <!-- Glyphs CollectionView -->
-        <CollectionView x:Name="GlyphsCollection" Grid.Row="3">
+        <CollectionView x:Name="GlyphsCollection" Grid.Row="3"
+                        ItemSizingStrategy="MeasureFirstItem">
             <CollectionView.ItemsLayout>
                 <GridItemsLayout Orientation="Vertical" Span="8"
                                  HorizontalItemSpacing="2" VerticalItemSpacing="2" />
             </CollectionView.ItemsLayout>
             <CollectionView.ItemTemplate>
                 <DataTemplate>
-                    <Border StrokeShape="RoundRectangle 6"
-                            Stroke="{AppThemeBinding Light={StaticResource Gray200}, Dark={StaticResource Gray600}}"
-                            Padding="4">
-                        <Border.GestureRecognizers>
+                    <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="2" Padding="4">
+                        <Grid.GestureRecognizers>
                             <TapGestureRecognizer NumberOfTapsRequired="1" Tapped="OnGlyphLongPressed" />
-                        </Border.GestureRecognizers>
-                        <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="2">
-                            <Label Text="{Binding Character}"
-                                   FontFamily="{Binding Source={x:Reference thisPage}, Path=IconFontFamily}"
-                                   FontSize="{Binding Source={x:Reference thisPage}, Path=FontIconSize}"
-                                   HorizontalOptions="Center"
-                                   HorizontalTextAlignment="Center" />
-                            <Label Grid.Row="1" Text="{Binding UnicodeCode}"
-                                   FontSize="9" HorizontalOptions="Center"
-                                   TextColor="{StaticResource Primary}" />
-                            <Label Grid.Row="2" Text="{Binding GlyphName}"
-                                   IsVisible="{Binding HasGlyphName}"
-                                   FontSize="7" HorizontalOptions="Center"
-                                   HorizontalTextAlignment="Center"
-                                   LineBreakMode="TailTruncation" MaxLines="1"
-                                   TextColor="{StaticResource Gray400}" />
-                        </Grid>
-                    </Border>
+                        </Grid.GestureRecognizers>
+                        <Label Text="{Binding Character}"
+                               FontFamily="{Binding Source={x:Reference thisPage}, Path=IconFontFamily}"
+                               FontSize="{Binding Source={x:Reference thisPage}, Path=FontIconSize}"
+                               HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center" />
+                        <Label Grid.Row="1" Text="{Binding UnicodeCode}"
+                               FontSize="9" HorizontalOptions="Center"
+                               TextColor="{StaticResource Primary}" />
+                        <Label Grid.Row="2" Text="{Binding GlyphName}"
+                               IsVisible="{Binding HasGlyphName}"
+                               FontSize="7" HorizontalOptions="Center"
+                               HorizontalTextAlignment="Center"
+                               LineBreakMode="TailTruncation" MaxLines="1"
+                               TextColor="{StaticResource Gray400}" />
+                    </Grid>
                 </DataTemplate>
             </CollectionView.ItemTemplate>
             <CollectionView.EmptyView>

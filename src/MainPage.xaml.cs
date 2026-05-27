@@ -69,6 +69,8 @@ public partial class MainPage : ContentPage
 		}
 
 		GlyphsCollection.ItemsSource = glyphs;
+		if (glyphs.Count > 0)
+			GlyphsCollection.ScrollTo(0, position: ScrollToPosition.Start, animate: false);
 		ShowToast($"{glyphs.Count} ícones");
 	}
 
