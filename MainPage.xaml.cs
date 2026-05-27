@@ -25,6 +25,7 @@ public partial class MainPage : ContentPage
 		["Segoe Fluent Icons"] = "SegoeFluentIcons",
 		["Font Awesome 5 Regular"] = "FontAwesome5Regular",
 		["Material Symbols Outlined"] = "MaterialSymbolsOutlined",
+		["Fluent System Icons Filled"] = "FluentSystemIconsFilled",
 	};
 
 	private readonly Dictionary<string, string> _fontFiles = new()
@@ -32,6 +33,7 @@ public partial class MainPage : ContentPage
 		["SegoeFluentIcons"] = "segoe-fluent-icons.ttf",
 		["FontAwesome5Regular"] = "fontawesome-5-free-regular-400.ttf",
 		["MaterialSymbolsOutlined"] = "MaterialSymbolsOutlined.ttf",
+		["FluentSystemIconsFilled"] = "FluentSystemIcons-Filled.ttf",
 	};
 
 	public MainPage()
@@ -51,7 +53,7 @@ public partial class MainPage : ContentPage
 
 		var fontData = _fontFiles.TryGetValue(fontFamily, out var fileName)
 			? await FontGlyphNameReader.ReadFontDataAsync(fileName)
-			: new(new(), new());
+			: new(new(), new(), 0);
 
 		var glyphs = new List<GlyphItem>();
 
@@ -67,7 +69,7 @@ public partial class MainPage : ContentPage
 		}
 
 		GlyphsCollection.ItemsSource = glyphs;
-		ShowToast($"{selectedFont}: {glyphs.Count} ícones encontrados");
+		ShowToast($"{glyphs.Count} ícones");
 	}
 
 	private CancellationTokenSource? _toastCts;

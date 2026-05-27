@@ -3,7 +3,7 @@ using SkiaSharp;
 
 namespace FontViewer;
 
-public record FontGlyphData(HashSet<int> ValidCodepoints, Dictionary<int, string> Names);
+public record FontGlyphData(HashSet<int> ValidCodepoints, Dictionary<int, string> Names, int TotalGlyphCount);
 
 public static class FontGlyphNameReader
 {
@@ -16,20 +16,21 @@ public static class FontGlyphNameReader
 			await stream.CopyToAsync(ms);
 			var data = ms.ToArray();
 
-			using var skStream = new SKMemoryStream(data);
-			using var typeface = SKTypeface.FromStream(skStream);
+			using var skData = SKData.CreateCopy(data);
+			using var typeface = SKTypeface.FromData(skData);
 
 			if (typeface == null)
-				return new([], new());
+				return new([], new(), 0);
 
+			int totalGlyphs = typeface.GlyphCount;
 			var (validCodepoints, codepointToGlyphId) = DetectValidGlyphs(typeface);
 			var names = ExtractGlyphNames(data, codepointToGlyphId);
 
-			return new(validCodepoints, names);
+			return new(validCodepoints, names, totalGlyphs);
 		}
 		catch
 		{
-			return new([], new());
+			return new([], new(), 0);
 		}
 	}
 

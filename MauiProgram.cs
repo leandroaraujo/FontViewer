@@ -18,6 +18,7 @@ public static class MauiProgram
 				fonts.AddFont("segoe-fluent-icons.ttf", "SegoeFluentIcons");
 				fonts.AddFont("fontawesome-5-free-regular-400.ttf", "FontAwesome5Regular");
 				fonts.AddFont("MaterialSymbolsOutlined.ttf", "MaterialSymbolsOutlined");
+				fonts.AddFont("FluentSystemIcons-Filled.ttf", "FluentSystemIconsFilled");
 			});
 
 #if DEBUG
