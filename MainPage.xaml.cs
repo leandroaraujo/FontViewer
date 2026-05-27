@@ -67,6 +67,7 @@ public partial class MainPage : ContentPage
 		}
 
 		GlyphsCollection.ItemsSource = glyphs;
+		ShowToast($"{selectedFont}: {glyphs.Count} ícones encontrados");
 	}
 
 	private CancellationTokenSource? _toastCts;

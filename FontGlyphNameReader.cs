@@ -1,12 +1,10 @@
 using System.Text;
+using SkiaSharp;
 
 namespace FontViewer;
 
 public record FontGlyphData(HashSet<int> ValidCodepoints, Dictionary<int, string> Names);
 
-/// <summary>
-/// Reads glyph names from a TrueType font file by parsing the cmap and post tables.
-/// </summary>
 public static class FontGlyphNameReader
 {
 	public static async Task<FontGlyphData> ReadFontDataAsync(string fontFileName)
@@ -17,36 +15,60 @@ public static class FontGlyphNameReader
 			using var ms = new MemoryStream();
 			await stream.CopyToAsync(ms);
 			var data = ms.ToArray();
-			return ParseFont(data);
+
+			using var skStream = new SKMemoryStream(data);
+			using var typeface = SKTypeface.FromStream(skStream);
+
+			if (typeface == null)
+				return new([], new());
+
+			var (validCodepoints, codepointToGlyphId) = DetectValidGlyphs(typeface);
+			var names = ExtractGlyphNames(data, codepointToGlyphId);
+
+			return new(validCodepoints, names);
 		}
 		catch
 		{
-			return new(new(), new());
+			return new([], new());
 		}
 	}
 
-	private static FontGlyphData ParseFont(byte[] data)
+	private static (HashSet<int> valid, Dictionary<int, ushort> cpToGlyph) DetectValidGlyphs(SKTypeface typeface)
 	{
-		var tables = ReadTableDirectory(data);
+		var valid = new HashSet<int>();
+		var cpToGlyph = new Dictionary<int, ushort>();
 
-		if (!tables.TryGetValue("cmap", out var cmapInfo))
-			return new(new(), new());
-
-		var unicodeToGlyph = ParseCmap(data, cmapInfo.Offset);
-		var validCodepoints = new HashSet<int>(unicodeToGlyph.Keys);
-
-		var names = new Dictionary<int, string>();
-		if (tables.TryGetValue("post", out var postInfo))
+		// Map each BMP codepoint individually for reliable detection
+		for (int cp = 0x0020; cp <= 0xFFFF; cp++)
 		{
-			var glyphToName = ParsePost(data, postInfo.Offset, postInfo.Length);
-			foreach (var (unicode, glyphId) in unicodeToGlyph)
+			if (cp >= 0xD800 && cp <= 0xDFFF) continue;
+			ushort glyphId = typeface.GetGlyph(cp);
+			if (glyphId != 0)
 			{
-				if (glyphToName.TryGetValue(glyphId, out var name) && !string.IsNullOrEmpty(name))
-					names[unicode] = name;
+				valid.Add(cp);
+				cpToGlyph[cp] = glyphId;
 			}
 		}
 
-		return new(validCodepoints, names);
+		return (valid, cpToGlyph);
+	}
+
+	private static Dictionary<int, string> ExtractGlyphNames(byte[] data, Dictionary<int, ushort> cpToGlyph)
+	{
+		var tables = ReadTableDirectory(data);
+		if (!tables.TryGetValue("post", out var postInfo))
+			return new();
+
+		var glyphToName = ParsePost(data, postInfo.Offset, postInfo.Length);
+		var names = new Dictionary<int, string>();
+
+		foreach (var (cp, glyphId) in cpToGlyph)
+		{
+			if (glyphToName.TryGetValue(glyphId, out var name) && !string.IsNullOrEmpty(name))
+				names[cp] = name;
+		}
+
+		return names;
 	}
 
 	private static Dictionary<string, (uint Offset, uint Length)> ReadTableDirectory(byte[] data)
@@ -64,102 +86,6 @@ public static class FontGlyphNameReader
 		}
 
 		return tables;
-	}
-
-	private static Dictionary<int, int> ParseCmap(byte[] data, uint tableOffset)
-	{
-		var map = new Dictionary<int, int>();
-		int numSubtables = ReadUInt16(data, (int)tableOffset + 2);
-
-		uint bestOffset = 0;
-		int bestPriority = -1;
-
-		for (int i = 0; i < numSubtables; i++)
-		{
-			int rec = (int)tableOffset + 4 + i * 8;
-			int platformId = ReadUInt16(data, rec);
-			int encodingId = ReadUInt16(data, rec + 2);
-			uint subtableOff = ReadUInt32(data, rec + 4) + tableOffset;
-
-			int priority = -1;
-			if (platformId == 3 && encodingId == 10) priority = 3;      // Windows Unicode full
-			else if (platformId == 0 && encodingId == 4) priority = 2;  // Unicode full
-			else if (platformId == 3 && encodingId == 1) priority = 1;  // Windows Unicode BMP
-			else if (platformId == 0) priority = 0;                     // Unicode any
-
-			if (priority > bestPriority)
-			{
-				bestPriority = priority;
-				bestOffset = subtableOff;
-			}
-		}
-
-		if (bestOffset == 0) return map;
-
-		int format = ReadUInt16(data, (int)bestOffset);
-		if (format == 4) ParseCmapFormat4(data, (int)bestOffset, map);
-		else if (format == 12) ParseCmapFormat12(data, (int)bestOffset, map);
-
-		return map;
-	}
-
-	private static void ParseCmapFormat4(byte[] data, int offset, Dictionary<int, int> map)
-	{
-		int segCountX2 = ReadUInt16(data, offset + 6);
-		int segCount = segCountX2 / 2;
-
-		int endCodesOff = offset + 14;
-		int startCodesOff = endCodesOff + segCountX2 + 2; // +2 for reservedPad
-		int idDeltaOff = startCodesOff + segCountX2;
-		int idRangeOff = idDeltaOff + segCountX2;
-
-		for (int i = 0; i < segCount; i++)
-		{
-			int endCode = ReadUInt16(data, endCodesOff + i * 2);
-			int startCode = ReadUInt16(data, startCodesOff + i * 2);
-			int idDelta = ReadInt16(data, idDeltaOff + i * 2);
-			int idRange = ReadUInt16(data, idRangeOff + i * 2);
-
-			if (startCode == 0xFFFF) break;
-
-			for (int c = startCode; c <= endCode; c++)
-			{
-				int glyphId;
-				if (idRange == 0)
-				{
-					glyphId = (c + idDelta) & 0xFFFF;
-				}
-				else
-				{
-					int glyphIdAddr = idRangeOff + i * 2 + idRange + (c - startCode) * 2;
-					glyphId = ReadUInt16(data, glyphIdAddr);
-					if (glyphId != 0) glyphId = (glyphId + idDelta) & 0xFFFF;
-				}
-
-				if (glyphId != 0)
-					map[c] = glyphId;
-			}
-		}
-	}
-
-	private static void ParseCmapFormat12(byte[] data, int offset, Dictionary<int, int> map)
-	{
-		int numGroups = (int)ReadUInt32(data, offset + 12);
-
-		for (int i = 0; i < numGroups; i++)
-		{
-			int groupOff = offset + 16 + i * 12;
-			int startCharCode = (int)ReadUInt32(data, groupOff);
-			int endCharCode = (int)ReadUInt32(data, groupOff + 4);
-			int startGlyphId = (int)ReadUInt32(data, groupOff + 8);
-
-			for (int c = startCharCode; c <= endCharCode; c++)
-			{
-				int glyphId = startGlyphId + (c - startCharCode);
-				if (glyphId != 0)
-					map[c] = glyphId;
-			}
-		}
 	}
 
 	private static Dictionary<int, string> ParsePost(byte[] data, uint offset, uint length)
